@@ -1,0 +1,10 @@
+{
+    "name":  "FiresMonsterOverhaul",
+    "version_number":  "0.0.20",
+    "website_url":  "",
+    "description":  "Part of the Fires mod family for Valheim.",
+    "dependencies":  [
+                         "denikson-BepInExPack_Valheim-5.4.2350",
+                         "incompletionists-FiresUnifiedCore-0.2.387"
+                     ]
+}

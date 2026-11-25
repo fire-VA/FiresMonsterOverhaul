@@ -55,7 +55,14 @@ namespace FiresMonsterOverhaul.Affixes
 
         private void Update()
         {
-            if (!MonsterConfig.Enabled.Value || Time.time < _nextTick) return;
+            long perfT = FiresMonsterOverhaul.Perf.FmoPerf.Start();
+            try { UpdateBody(); }
+            finally { FiresMonsterOverhaul.Perf.FmoPerf.Stop(FiresMonsterOverhaul.Perf.FmoPerf.Path.AffixRunner, perfT); }
+        }
+
+        private void UpdateBody()
+        {
+            if (Time.time < _nextTick || !MonsterConfig.Enabled.Value) return;   // 0.0.48: the cheap clock check first (the config read was every frame)
             _nextTick = Time.time + Tick;
             if (_nview == null || !_nview.IsValid() || !_nview.IsOwner() || _character == null || _character.IsDead()) return;
             var zdo = _nview.GetZDO();
@@ -79,7 +86,7 @@ namespace FiresMonsterOverhaul.Affixes
             if (zdo.GetBool(ZdoChampionPhase)) return;
             float max = _character.GetMaxHealth();
             if (max <= 0f || _character.GetHealth() > max * ChampionPhaseHealth) return;
-            if (_cast == null) _cast = GetComponent<MonsterCast>() ?? gameObject.AddComponent<MonsterCast>();
+            if (_cast == null) _cast = GetComponent<MonsterCast>() ?? Patches.HoldWhileCastingPatch.Added(gameObject.AddComponent<MonsterCast>());
             if (_cast.Active) return; // after the current cast ends or is interrupted
             float seconds = MonsterConfig.ChampionPhaseCastSeconds.Value;
             bool begun = _cast.Begin("rally", seconds, false, 2, RallyRingRadius, () =>
@@ -196,7 +203,7 @@ namespace FiresMonsterOverhaul.Affixes
         private void TryMendingPulse()
         {
             if (Time.time < _nextPulse) return;
-            if (_cast == null) _cast = GetComponent<MonsterCast>() ?? gameObject.AddComponent<MonsterCast>();
+            if (_cast == null) _cast = GetComponent<MonsterCast>() ?? Patches.HoldWhileCastingPatch.Added(gameObject.AddComponent<MonsterCast>());
             if (_cast.Active) return;
             float radius = MonsterConfig.MendingAuraRadius.Value;
             if (CollectHurtAllies(radius) == 0) return;

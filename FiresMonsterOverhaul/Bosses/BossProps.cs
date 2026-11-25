@@ -35,7 +35,7 @@ namespace FiresMonsterOverhaul.Bosses
         {
             var prefab = ZNetScene.instance != null ? ZNetScene.instance.GetPrefab(prefabName) : null;
             if (prefab == null) return null;
-            if (ZoneSystem.instance != null && ZoneSystem.instance.GetGroundHeight(at, out float y)) at.y = y;
+            RingUp.Ground(ref at, 0f, "fmo spawn");   // 0.0.46: the ring floor on a halo ring, else the heightmap as before
             var go = Object.Instantiate(prefab, at, rotation);
             var nv = go.GetComponent<ZNetView>();
             if (nv == null || !nv.IsValid()) return null;

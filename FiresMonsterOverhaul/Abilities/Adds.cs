@@ -23,7 +23,7 @@ namespace FiresMonsterOverhaul.Abilities
             var source = ZNetScene.instance != null ? ZNetScene.instance.GetPrefab(prefab) : null;
             var makerView = maker != null ? maker.GetComponent<ZNetView>() : null;
             if (source == null || makerView == null || !makerView.IsValid()) return null;
-            if (ZoneSystem.instance != null && ZoneSystem.instance.GetGroundHeight(at, out float y)) at.y = y + 0.1f;
+            RingUp.Ground(ref at, 0.1f, "fmo spawn");   // 0.0.46: the ring floor on a halo ring, else the heightmap as before
             var go = UnityEngine.Object.Instantiate(source, at, rotation);
             var nv = go.GetComponent<ZNetView>();
             var copy = go.GetComponent<Character>();

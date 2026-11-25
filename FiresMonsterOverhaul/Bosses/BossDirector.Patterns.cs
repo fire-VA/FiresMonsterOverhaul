@@ -225,8 +225,11 @@ namespace FiresMonsterOverhaul.Bosses
             for (int i = 0; i < count; i++)
             {
                 float angle = (start + i * 360f / Mathf.Max(1, count)) * Mathf.Deg2Rad;
-                Vector3 at = transform.position + new Vector3(Mathf.Sin(angle), 0f, Mathf.Cos(angle)) * radius;
-                var nv = BossProps.Place(prefab, at, Quaternion.Euler(0f, Random.Range(0f, 360f), 0f), health, Zdo.m_uid);
+                Vector3 offset = new Vector3(Mathf.Sin(angle), 0f, Mathf.Cos(angle)) * radius;
+                // 0.0.46 (halo ring): the prop circle lies in the ring's floor plane and each prop stands upright to it
+                if (RingUp.OnRing(transform.position, out Vector3 ringUp)) offset = Quaternion.FromToRotation(Vector3.up, ringUp) * offset;
+                Vector3 at = transform.position + offset;
+                var nv = BossProps.Place(prefab, at, RingUp.Upright(at, Random.Range(0f, 360f)), health, Zdo.m_uid);
                 if (nv != null) ids.Add(nv.GetZDO().m_uid);
             }
             SetObjects(ids);
@@ -247,7 +250,7 @@ namespace FiresMonsterOverhaul.Bosses
                 {
                     z.Set(ZdoFeederOf, Zdo.m_uid);
                     z.Set(Affixes.AffixRunner.ZdoSummonedBy, Zdo.m_uid);
-                    if (c.GetComponent<Feeder>() == null) c.gameObject.AddComponent<Feeder>();
+                    if (c.GetComponent<Feeder>() == null) { c.gameObject.AddComponent<Feeder>(); Patches.HoldWhileCastingPatch.Invalidate(c.gameObject); }
                 });
                 if (feeder != null) ids.Add(feeder.GetZDOID());
             }

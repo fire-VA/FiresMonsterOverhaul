@@ -38,15 +38,53 @@ namespace FiresMonsterOverhaul.Setup
         public static Heightmap.Biome BiomeAt(Vector3 pos) =>
             WorldGenerator.instance != null ? WorldGenerator.instance.GetBiome(pos) : Heightmap.Biome.None;
 
-        public static bool InDungeon(Vector3 pos) => pos.y > DungeonHeight;
+        // 0.0.46 (halo ring): a ring floor can sit above 4500 m; ring creatures are never "in a dungeon" (they kept dungeon tiers)
+        public static bool InDungeon(Vector3 pos) => pos.y > DungeonHeight && !RingUp.OnRing(pos);
 
-        /// <summary>Bosses defeated in this world (0-7), from the synced global keys.</summary>
-        public static int BossLevel()
+        private static System.Reflection.MethodInfo _privateTier;
+        private static bool _privateLooked;
+
+        /// <summary>
+        /// The boss level at a point: the highest boss TIER (1 Eikthyr .. 7 Fader, 0 none) any player within [08 - Creature Setup]
+        /// Boss Level Player Radius has defeated (Fire 10-13). Source: RPGmaker's private keys,
+        /// FiresRPGmaker.Modules.Progression.PrivateKeyManager.GetHighestBossTierNear(Vector3, float) (contract, RPGmaker 0.0.572+;
+        /// works on the dedi). -1 there (private keys off, nobody in range) or no RPGmaker: the highest global boss key.
+        /// </summary>
+        public static int BossLevel(Vector3 pos) => BossLevel(pos, out _);
+
+        public static int BossLevel(Vector3 pos, out string source)
+        {
+            if (!_privateLooked)
+            {
+                _privateLooked = true;
+                var t = System.Type.GetType("FiresRPGmaker.Modules.Progression.PrivateKeyManager, FiresRPGmaker");
+                if (t == null)
+                    foreach (var asm in System.AppDomain.CurrentDomain.GetAssemblies())
+                        if ((t = asm.GetType("FiresRPGmaker.Modules.Progression.PrivateKeyManager", false)) != null) break;
+                _privateTier = t?.GetMethod("GetHighestBossTierNear", System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Static,
+                    null, new[] { typeof(Vector3), typeof(float) }, null);
+                if (_privateTier != null && _privateTier.ReturnType != typeof(int)) _privateTier = null;
+                MonsterLog.Debug(_privateTier != null ? "setup: boss level from RPGmaker PrivateKeyManager.GetHighestBossTierNear" : "setup: no RPGmaker GetHighestBossTierNear; boss level from global keys");
+            }
+            if (_privateTier != null)
+            {
+                try
+                {
+                    int tier = (int)_privateTier.Invoke(null, new object[] { pos, MonsterConfig.BossLevelRadius.Value });
+                    if (tier >= 0) { source = "private keys"; return Mathf.Clamp(tier, 0, BossKeys.Length); }
+                }
+                catch (System.Exception e) { MonsterLog.Debug($"setup: GetHighestBossTierNear threw {e.GetType().Name}; global keys"); }
+            }
+            source = "global keys";
+            return GlobalTier();
+        }
+
+        /// <summary>The highest boss tier in the world's global keys (1 Eikthyr .. 7 Fader, 0 none).</summary>
+        private static int GlobalTier()
         {
             if (ZoneSystem.instance == null) return 0;
-            int n = 0;
-            foreach (var key in BossKeys) if (ZoneSystem.instance.GetGlobalKey(key)) n++;
-            return n;
+            for (int i = BossKeys.Length - 1; i >= 0; i--) if (ZoneSystem.instance.GetGlobalKey(BossKeys[i])) return i + 1;
+            return 0;
         }
 
         /// <summary>Marks a creature as already set up (test spawns: fmo_tier, fmo_pack stay deterministic).</summary>
@@ -68,7 +106,7 @@ namespace FiresMonsterOverhaul.Setup
             var biome = BiomeAt(pos);
             bool dungeon = InDungeon(pos);
             bool night = EnvMan.IsNight();
-            int bosses = BossLevel();
+            int bosses = BossLevel(pos, out string bossSource);
             string prefab = Utils.GetPrefabName(c.gameObject);
             var r = CreatureRules.Evaluate(prefab, biome, dungeon, night, bosses);
             if (r.Neutral) return;
@@ -86,7 +124,7 @@ namespace FiresMonsterOverhaul.Setup
             if (full) c.SetHealth(c.GetMaxHealth());
 
             MonsterLog.Debug($"setup: {prefab} L{before}->L{level} hp x{r.Health:0.00} = {c.GetMaxHealth():0} dmg x{r.Damage:0.00} " +
-                             $"({r.Why}; biome {biome}{(dungeon ? ", dungeon" : "")}{(night ? ", night" : "")}, bosslevel {bosses}; " +
+                             $"({r.Why}; biome {biome}{(dungeon ? ", dungeon" : "")}{(night ? ", night" : "")}, bosslevel {bosses} ({bossSource}); " +
                              $"star roll {roll:0.000} vs 1* {r.Star1:0.000} / 2* {r.Star2:0.000}) {zdo.m_uid}");
         }
 

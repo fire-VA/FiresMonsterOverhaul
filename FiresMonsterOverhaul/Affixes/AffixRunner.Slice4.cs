@@ -85,8 +85,8 @@ namespace FiresMonsterOverhaul.Affixes
             if (prefab == null) { MonsterLog.Warning($"affix: {Prefab} Warded but no ward totem prefab: it stays unwarded"); return; }
             Vector2 dir = Random.insideUnitCircle.normalized;
             Vector3 at = transform.position + new Vector3(dir.x, 0f, dir.y) * WardOffset;
-            if (ZoneSystem.instance != null && ZoneSystem.instance.GetGroundHeight(at, out float y)) at.y = y;
-            var go = Object.Instantiate(prefab, at, Quaternion.Euler(0f, Random.Range(0f, 360f), 0f));
+            RingUp.Ground(ref at, 0f, "fmo spawn");   // 0.0.46: the ring floor on a halo ring, else the heightmap as before
+            var go = Object.Instantiate(prefab, at, RingUp.Upright(at, Random.Range(0f, 360f)));   // 0.0.46: upright to a halo ring
             var nv = go.GetComponent<ZNetView>();
             if (nv == null || !nv.IsValid()) return;
             float health = Mathf.Max(WardMinHealth, _character.GetMaxHealth() * MonsterConfig.WardHealth.Value);
@@ -151,7 +151,7 @@ namespace FiresMonsterOverhaul.Affixes
         {
             if (Time.time < _nextSummon) return;
             if (AliveAdds(zdo) >= MonsterConfig.SummonMaxAlive.Value) return;
-            if (_cast == null) _cast = GetComponent<MonsterCast>() ?? gameObject.AddComponent<MonsterCast>();
+            if (_cast == null) _cast = GetComponent<MonsterCast>() ?? Patches.HoldWhileCastingPatch.Added(gameObject.AddComponent<MonsterCast>());
             if (_cast.Active) return;
             float seconds = MonsterConfig.SummonCastSeconds.Value;
             string prefab = Prefab;
@@ -189,7 +189,7 @@ namespace FiresMonsterOverhaul.Affixes
             var target = _ai.m_targetCreature;
             if (target == null || target.IsDead() || !(target.IsPlayer() || target.IsTamed())) return;
             if (Vector3.Distance(transform.position, target.transform.position) > HexRange || !_ai.CanSeeTarget(target)) return;
-            if (_cast == null) _cast = GetComponent<MonsterCast>() ?? gameObject.AddComponent<MonsterCast>();
+            if (_cast == null) _cast = GetComponent<MonsterCast>() ?? Patches.HoldWhileCastingPatch.Added(gameObject.AddComponent<MonsterCast>());
             if (_cast.Active) return;
             float seconds = MonsterConfig.HexCastSeconds.Value;
             string prefab = Prefab;
@@ -239,7 +239,15 @@ namespace FiresMonsterOverhaul.Affixes
             MonsterLog.Debug($"affix: {Prefab} {ElementLabel(zdo).ToLowerInvariant()} ground at {at:F1} (r {radius:0.#} m, {seconds:0} s, {dps:0.#}/s) {zdo.m_uid}");
         }
 
-        private static void EnsureHazardRpc()
+        /// <summary>0.0.40 (boss phases): the Elemental ring, broadcast by a boss script (element 0 fire, 1 frost, 2 poison).</summary>
+        internal static void BroadcastHazard(Vector3 at, float radius, float seconds, float dps, int element)
+        {
+            if (ZRoutedRpc.instance == null) return;
+            EnsureHazardRpc();
+            ZRoutedRpc.instance.InvokeRoutedRPC(ZRoutedRpc.Everybody, RpcHazard, at, radius, seconds, dps, element);
+        }
+
+        internal static void EnsureHazardRpc()   // 0.0.39: internal for the ZNet.Awake registration
         {
             var rpc = ZRoutedRpc.instance;
             if (rpc == null || rpc == _hazardRpcOn) return;
@@ -271,7 +279,7 @@ namespace FiresMonsterOverhaul.Affixes
                 else if (element == 2) hit.m_damage.m_poison = dps;
                 else hit.m_damage.m_fire = dps;
                 hit.m_point = player.GetCenterPoint();
-                hit.m_dir = Vector3.up;
+                hit.m_dir = RingUp.Up(player.transform.position);   // 0.0.46: along a halo ring's up
                 hit.m_hitType = HitData.HitType.EnemyHit;
                 player.Damage(hit);
                 if (logged) continue;

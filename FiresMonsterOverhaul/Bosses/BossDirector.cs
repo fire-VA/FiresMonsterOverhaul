@@ -45,13 +45,20 @@ namespace FiresMonsterOverhaul.Bosses
 
         internal MonsterCast Cast()
         {
-            if (_cast == null) _cast = GetComponent<MonsterCast>() ?? gameObject.AddComponent<MonsterCast>();
+            if (_cast == null) _cast = GetComponent<MonsterCast>() ?? Patches.HoldWhileCastingPatch.Added(gameObject.AddComponent<MonsterCast>());
             return _cast;
         }
 
         private void Update()
         {
-            if (!MonsterConfig.Enabled.Value || !MonsterConfig.Bosses.Value || Time.time < _nextTick) return;
+            long perfT = FiresMonsterOverhaul.Perf.FmoPerf.Start();
+            try { UpdateBody(); }
+            finally { FiresMonsterOverhaul.Perf.FmoPerf.Stop(FiresMonsterOverhaul.Perf.FmoPerf.Path.BossDirector, perfT); }
+        }
+
+        private void UpdateBody()
+        {
+            if (Time.time < _nextTick || !MonsterConfig.Enabled.Value || !MonsterConfig.Bosses.Value) return;   // 0.0.48: the cheap clock check first
             _nextTick = Time.time + Tick;
             if (Nview == null || !Nview.IsValid() || !Nview.IsOwner() || Body == null || Body.IsDead()) return;
             if (SpiritForm.IsSpirit(Zdo)) { enabled = false; Destroy(this); return; } // a boss's spirit add is no boss
@@ -62,6 +69,9 @@ namespace FiresMonsterOverhaul.Bosses
             TickPattern();
         }
 
+        /// <summary>0.0.40: raised on the owner with the boss's ZDOID and the phase name each time a phase fires (tests only).</summary>
+        internal static event System.Action<ZDOID, string> PhaseFired;
+
         /// <summary>True the first time this phase fires for this boss (then never again).</summary>
         internal bool FirePhase(int bit, string name, float healthFraction)
         {
@@ -70,6 +80,7 @@ namespace FiresMonsterOverhaul.Bosses
             if ((fired & bit) != 0) return false;
             zdo.Set(ZdoPhases, fired | bit);
             MonsterLog.Debug($"boss: {Prefab} phase {name} at {healthFraction:P0} health {zdo.m_uid}");
+            PhaseFired?.Invoke(zdo.m_uid, name);   // 0.0.40: the fmo_boss_phase_test reads the phase line in memory
             return true;
         }
 
@@ -142,6 +153,12 @@ namespace FiresMonsterOverhaul.Bosses
             {
                 case "Eikthyr": return new EikthyrScript();
                 case "gd_king": return new ElderScript();
+                case "Bonemass": return new BonemassScript();
+                // 0.0.40 (Fire): the later bosses' phases, on this same system
+                case "Dragon": return new ModerScript();
+                case "GoblinKing": return new YagluthScript();
+                case "SeekerQueen": return new QueenScript();
+                case "Fader": return new FaderScript();
                 default: return null; // the soft enrage still applies
             }
         }

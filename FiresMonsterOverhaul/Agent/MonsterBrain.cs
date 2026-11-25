@@ -82,7 +82,14 @@ namespace FiresMonsterOverhaul.Agent
 
         private void Update()
         {
-            if (!MonsterConfig.Enabled.Value || Time.time < _nextTick) return;
+            long perfT = FiresMonsterOverhaul.Perf.FmoPerf.Start();
+            try { UpdateBody(); }
+            finally { FiresMonsterOverhaul.Perf.FmoPerf.Stop(FiresMonsterOverhaul.Perf.FmoPerf.Path.MonsterBrain, perfT); }
+        }
+
+        private void UpdateBody()
+        {
+            if (Time.time < _nextTick || !MonsterConfig.Enabled.Value) return;   // 0.0.48: the cheap clock check first (the config read was every frame)
             _nextTick = Time.time + Tick;
             if (_agent == null || !_agent.IsOwner || !_agent.IsAlive) return;
 

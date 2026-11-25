@@ -39,15 +39,32 @@ namespace FiresMonsterOverhaul.Ui
         private static readonly List<Character> Dead = new List<Character>();
         private static readonly StringBuilder Text = new StringBuilder();
 
+        // 0.0.26 perf: per nameplate, the tier tag + ZNetView looked up once (null = not an overhaul monster), not every frame
+        private static readonly Dictionary<Character, ZNetView> Views = new Dictionary<Character, ZNetView>();
+
         private static void Postfix(EnemyHud __instance)
+        {
+            long t = FiresMonsterOverhaul.Perf.FmoPerf.Start();
+            try { Run(__instance); }
+            finally { FiresMonsterOverhaul.Perf.FmoPerf.Stop(FiresMonsterOverhaul.Perf.FmoPerf.Path.EnemyHud, t); }
+        }
+
+        private static ZNetView ViewOf(Character c)
+        {
+            if (!FiresMonsterOverhaul.Perf.FmoPerf.Caches) return c.GetComponent<MonsterTierTag>() != null ? c.GetComponent<ZNetView>() : null;
+            if (!Views.TryGetValue(c, out var nv)) { nv = c.GetComponent<MonsterTierTag>() != null ? c.GetComponent<ZNetView>() : null; Views[c] = nv; }
+            return nv;
+        }
+
+        private static void Run(EnemyHud __instance)
         {
             if (!MonsterConfig.Enabled.Value) return;
             foreach (var pair in __instance.m_huds)
             {
                 var c = pair.Key;
                 var hud = pair.Value;
-                if (c == null || hud == null || hud.m_gui == null || c.GetComponent<MonsterTierTag>() == null) continue;
-                var nv = c.GetComponent<ZNetView>();
+                if (c == null || hud == null || hud.m_gui == null) continue;
+                var nv = ViewOf(c);
                 if (nv == null || !nv.IsValid()) continue;
                 var zdo = nv.GetZDO();
 
@@ -84,7 +101,7 @@ namespace FiresMonsterOverhaul.Ui
 
             Dead.Clear();
             foreach (var k in Bars.Keys) if (k == null) Dead.Add(k);
-            foreach (var k in Dead) Bars.Remove(k);
+            foreach (var k in Dead) Bars.Remove(k); Dead.Clear(); foreach (var k in Views.Keys) if (k == null) Dead.Add(k); foreach (var k in Dead) Views.Remove(k);
         }
 
         private static void UpdateTierLine(EnemyHud.HudData hud, ZDO zdo, BarState state)

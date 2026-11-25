@@ -65,6 +65,23 @@ namespace FiresMonsterOverhaul.Abilities
             var player = Player.m_localPlayer;
             if (player == null || player.IsDead()) return;
             Vector3 p = player.transform.position;
+            // 0.0.46 (halo ring): the same lane test in the ring's floor plane, height along the ring's up
+            if (RingUp.OnRing(p, out Vector3 up))
+            {
+                Vector3 lane = to - from, rel = p - from;
+                Vector3 laneF = lane - up * Vector3.Dot(lane, up), relF = rel - up * Vector3.Dot(rel, up);
+                float tr = laneF.sqrMagnitude > 0.01f ? Mathf.Clamp01(Vector3.Dot(relF, laneF) / laneF.sqrMagnitude) : 0f;
+                float offR = (relF - laneF * tr).magnitude;
+                Vector3 onLane = from + lane * tr;
+                if (offR > halfWidth + player.GetRadius() || Mathf.Abs(Vector3.Dot(p - onLane, up)) > Height)
+                {
+                    MonsterLog.Debug($"{label} missed {player.GetPlayerName()} ({offR:0.0} m from the lane, half-width {halfWidth:0.#} m, ring)");
+                    return;
+                }
+                RingUp.Proof("blast lane", p, up);
+                Hit(player, onLane + up * Vector3.Dot(p - onLane, up), damage, label, offR);
+                return;
+            }
             Vector3 a = new Vector3(from.x, 0f, from.z), b = new Vector3(to.x, 0f, to.z), q = new Vector3(p.x, 0f, p.z);
             Vector3 ab = b - a;
             float t = ab.sqrMagnitude > 0.01f ? Mathf.Clamp01(Vector3.Dot(q - a, ab) / ab.sqrMagnitude) : 0f;
@@ -114,7 +131,8 @@ namespace FiresMonsterOverhaul.Abilities
             var hit = new HitData();
             hit.m_damage.m_blunt = amount;
             hit.m_point = player.GetCenterPoint();
-            hit.m_dir = new Vector2(d.x, d.z).sqrMagnitude > 0.0001f ? new Vector3(d.x, 0f, d.z).normalized : Vector3.up;
+            Vector3 dF = RingUp.Flat(d, player.transform.position);   // 0.0.46: the push in the halo ring plane (exactly (d.x, 0, d.z) off a ring)
+            hit.m_dir = dF.sqrMagnitude > 0.0001f ? dF.normalized : RingUp.Up(player.transform.position);
             hit.m_pushForce = Push;
             hit.m_blockable = true;
             hit.m_dodgeable = true;

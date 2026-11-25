@@ -1,6 +1,8 @@
 using FiresMonsterOverhaul.Agent;
 using FiresMonsterOverhaul.Casts;
 using FiresMonsterOverhaul.Threat;
+using System.Collections.Generic;
+using System.Linq;
 using HarmonyLib;
 using UnityEngine;
 
@@ -19,6 +21,10 @@ namespace FiresMonsterOverhaul.Patches
             // Phase 2: every creature gets a role (auto + defaults + YAML override); the brain still runs only on the
             // families below.
             if (__instance.GetComponent<Roles.MonsterRoleTag>() == null) __instance.gameObject.AddComponent<Roles.MonsterRoleTag>();
+            // boss + mini-boss group scaling (it acts only on eligible creatures, on their owner)
+            if (__instance.GetComponent<Scaling.GroupScaler>() == null) __instance.gameObject.AddComponent<Scaling.GroupScaler>();
+            // monster gear, Phase 1 (Draugr / Skeletons; it rolls and re-equips on the owner)
+            if (Gear.MonsterGear.EligiblePrefab(Utils.GetPrefabName(__instance.gameObject)) && __instance.GetComponent<Gear.MonsterGear>() == null) __instance.gameObject.AddComponent<Gear.MonsterGear>();
             // Phase 3: every creature gets a tier (rolled once on its owner) and the affix runner (idle without affixes).
             if (__instance.GetComponent<Tiers.MonsterTierTag>() == null) __instance.gameObject.AddComponent<Tiers.MonsterTierTag>();
             if (__instance.GetComponent<Affixes.AffixRunner>() == null) __instance.gameObject.AddComponent<Affixes.AffixRunner>();
@@ -31,6 +37,7 @@ namespace FiresMonsterOverhaul.Patches
             if (Bosses.SpiritForm.IsSpirit(zdo)) Bosses.SpiritForm.Apply(body);
             if (zdo != null && zdo.GetZDOID(Bosses.BossDirector.ZdoFeederOf) != ZDOID.None && __instance.GetComponent<Bosses.Feeder>() == null)
                 __instance.gameObject.AddComponent<Bosses.Feeder>();
+            if (body != null && body.IsBoss() && __instance.GetComponent<Bosses.FightLog>() == null) __instance.gameObject.AddComponent<Bosses.FightLog>();   // the boss fight log (showcase)
             if (body != null && body.IsBoss() && __instance.GetComponent<Bosses.BossDirector>() == null) __instance.gameObject.AddComponent<Bosses.BossDirector>();
             Packs.PackSystem.OnAwake(__instance);
             var kind = MonsterBrain.Classify(Utils.GetPrefabName(__instance.gameObject));
@@ -194,17 +201,52 @@ namespace FiresMonsterOverhaul.Patches
     [HarmonyPatch(typeof(MonsterAI), nameof(MonsterAI.UpdateAI))]
     internal static class HoldWhileCastingPatch
     {
+        // 0.0.26 perf: the four components, looked up once per creature instead of on every AI update. FMO's late
+        // AddComponent sites (MonsterCast, Feeder) call Invalidate, so a component added later is seen on the next update.
+        private sealed class Refs { public Bosses.BossDirector Boss; public Bosses.Feeder Feeder; public Abilities.VeteranAbilities Abilities; public MonsterCast Cast; }
+        private static readonly Dictionary<MonsterAI, Refs> Cache = new Dictionary<MonsterAI, Refs>();
+        private static int _pruneFrame;
+
+        internal static MonsterCast Added(MonsterCast cast) { if (cast != null) Invalidate(cast.gameObject); return cast; }
+
+        internal static void Invalidate(GameObject go)
+        {
+            var ai = go != null ? go.GetComponent<MonsterAI>() : null;
+            if (ai != null) Cache.Remove(ai);
+        }
+
+        private static Refs Get(MonsterAI ai)
+        {
+            if (!FiresMonsterOverhaul.Perf.FmoPerf.Caches)
+                return new Refs { Boss = ai.GetComponent<Bosses.BossDirector>(), Feeder = ai.GetComponent<Bosses.Feeder>(), Abilities = ai.GetComponent<Abilities.VeteranAbilities>(), Cast = ai.GetComponent<MonsterCast>() };
+            if (Time.frameCount - _pruneFrame > 3000) { _pruneFrame = Time.frameCount; foreach (var k in Cache.Keys.Where(k => k == null).ToList()) Cache.Remove(k); }
+            if (!Cache.TryGetValue(ai, out var r))
+            {
+                r = new Refs { Boss = ai.GetComponent<Bosses.BossDirector>(), Feeder = ai.GetComponent<Bosses.Feeder>(), Abilities = ai.GetComponent<Abilities.VeteranAbilities>(), Cast = ai.GetComponent<MonsterCast>() };
+                Cache[ai] = r;
+            }
+            return r;
+        }
+
         private static bool Prefix(MonsterAI __instance, float dt, ref bool __result)
+        {
+            long t = FiresMonsterOverhaul.Perf.FmoPerf.Start();
+            try { return Run(__instance, dt, ref __result); }
+            finally { FiresMonsterOverhaul.Perf.FmoPerf.Stop(FiresMonsterOverhaul.Perf.FmoPerf.Path.UpdateAI, t); }
+        }
+
+        private static bool Run(MonsterAI __instance, float dt, ref bool __result)
         {
             var nv = __instance.m_nview;
             if (nv != null && nv.IsValid() && nv.GetZDO().GetLong(MonsterBrain.ZdoPossessed) != 0L) return true;
-            var boss = __instance.GetComponent<Bosses.BossDirector>();
+            var refs = Get(__instance);
+            var boss = refs.Boss;
             if (boss != null && boss.OverrideAI(__instance, dt)) { __result = true; return false; }
-            var feeder = __instance.GetComponent<Bosses.Feeder>();
+            var feeder = refs.Feeder;
             if (feeder != null && feeder.OverrideAI(__instance, dt)) { __result = true; return false; }
-            var abilities = __instance.GetComponent<Abilities.VeteranAbilities>();
+            var abilities = refs.Abilities;
             if (abilities != null && abilities.OverrideAI(__instance, dt)) { __result = true; return false; }
-            var cast = __instance.GetComponent<MonsterCast>();
+            var cast = refs.Cast;
             if (cast == null || !cast.Active || !cast.HoldsStill) return true;
             __instance.StopMoving();
             var target = __instance.m_targetCreature;
@@ -322,6 +364,7 @@ namespace FiresMonsterOverhaul.Patches
         {
             Affixes.HexEffect.Register(__instance);
             Bosses.EntangledEffect.Register(__instance);
+            Bosses.PlagueEffect.Register(__instance);
         }
     }
 
@@ -359,6 +402,7 @@ namespace FiresMonsterOverhaul.Patches
             if (c.GetComponent<Affixes.AffixRunner>() != null)
                 __result *= Affixes.AffixRunner.DamageMultiplier(c) * Setup.CreatureSetup.DamageMultiplier(c);
             if (c.IsBoss()) __result *= Bosses.BossDirector.DamageMultiplier(c);
+            __result *= Scaling.GroupScaler.DamageMultiplier(c);
         }
     }
 
@@ -369,13 +413,32 @@ namespace FiresMonsterOverhaul.Patches
     [HarmonyPatch(typeof(Character), nameof(Character.GetMaxHealthBase))]
     internal static class CreatureHealthPatch
     {
+        // 0.0.26 perf: GetMaxHealthBase runs on every GetHealth/GetMaxHealth (AI, HUD, damage); the multiplier is re-read
+        // from the ZDO only when the ZDO's data revision changes.
+        private static readonly Dictionary<Character, (ZDO zdo, uint rev, float m)> Cache = new Dictionary<Character, (ZDO, uint, float)>();
+        private static int _pruneFrame;
+
         private static void Postfix(Character __instance, ref float __result)
         {
-            if (__instance == null || __instance.IsPlayer()) return;
-            var nv = __instance.m_nview;
-            if (nv == null || !nv.IsValid()) return;
-            float m = nv.GetZDO().GetFloat(Setup.CreatureSetup.ZdoHealthMult, 1f);
-            if (m > 0f && m != 1f) __result *= m;
+            long t = FiresMonsterOverhaul.Perf.FmoPerf.Start();
+            try
+            {
+                if (__instance == null || __instance.IsPlayer()) return;
+                var nv = __instance.m_nview;
+                if (nv == null || !nv.IsValid()) return;
+                var zdo = nv.GetZDO();
+                float m;
+                if (!FiresMonsterOverhaul.Perf.FmoPerf.Caches) m = zdo.GetFloat(Setup.CreatureSetup.ZdoHealthMult, 1f);
+                else if (Cache.TryGetValue(__instance, out var c) && ReferenceEquals(c.zdo, zdo) && c.rev == zdo.DataRevision) m = c.m;
+                else
+                {
+                    if (Time.frameCount - _pruneFrame > 3000) { _pruneFrame = Time.frameCount; foreach (var k in Cache.Keys.Where(k => k == null).ToList()) Cache.Remove(k); }
+                    m = zdo.GetFloat(Setup.CreatureSetup.ZdoHealthMult, 1f);
+                    Cache[__instance] = (zdo, zdo.DataRevision, m);
+                }
+                if (m > 0f && m != 1f) __result *= m;
+            }
+            finally { FiresMonsterOverhaul.Perf.FmoPerf.Stop(FiresMonsterOverhaul.Perf.FmoPerf.Path.MaxHealthBase, t); }
         }
     }
 }

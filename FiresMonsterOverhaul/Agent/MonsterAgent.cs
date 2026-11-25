@@ -121,9 +121,9 @@ namespace FiresMonsterOverhaul.Agent
         {
             if (_ai == null || !IsOwner || threat == null) return false;
             Vector3 away = transform.position - threat.transform.position;
-            away.y = 0f;
+            away = RingUp.Flat(away, transform.position);   // 0.0.46: halo ring plane
             if (away.sqrMagnitude < 0.01f) away = transform.right;
-            Vector3 side = Vector3.Cross(Vector3.up, away.normalized);
+            Vector3 side = Vector3.Cross(RingUp.Up(transform.position), away.normalized);
             return _ai.MoveTo(Time.deltaTime, transform.position + side * 2.5f, 0.5f, true);
         }
 

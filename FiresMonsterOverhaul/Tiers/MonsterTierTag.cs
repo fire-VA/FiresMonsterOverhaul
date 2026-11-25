@@ -159,7 +159,7 @@ namespace FiresMonsterOverhaul.Tiers
                 var prefab = ZNetScene.instance != null ? ZNetScene.instance.GetPrefab(args[1]) : null;
                 if (player == null || prefab == null) { args.Context?.AddString("fmo_tier: no local player or unknown prefab"); return; }
                 Vector3 p = player.transform.position + player.transform.forward * 6f;
-                if (ZoneSystem.instance != null && ZoneSystem.instance.GetGroundHeight(p, out float y)) p.y = y + 0.1f;
+                RingUp.Ground(ref p, 0.1f, "fmo spawn");   // 0.0.46: the ring floor on a halo ring, else the heightmap as before
                 var go = Object.Instantiate(prefab, p, Quaternion.LookRotation(-player.transform.forward));
                 var nview = go.GetComponent<ZNetView>();
                 var character = go.GetComponent<Character>();

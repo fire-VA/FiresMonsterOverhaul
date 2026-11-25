@@ -18,6 +18,9 @@ namespace FiresMonsterOverhaul.Threat
 
         public int Count => _threat.Count;
 
+        /// <summary>Whether this source has any threat on the table (set drops: "engaged").</summary>
+        public bool Has(ZDOID id) => _threat.ContainsKey(id);
+
         public void Add(Character source, float amount, string why)
         {
             if (source == null || amount <= 0f) return;

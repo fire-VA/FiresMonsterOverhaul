@@ -18,7 +18,7 @@ namespace FiresMonsterOverhaul.Setup
                 if (args.Length < 2) { args.Context?.AddString("usage: fmo_setup_eval <prefab> [biome=Name] [night] [dungeon] [bosslevel=n]"); return; }
                 var biome = Heightmap.Biome.Meadows;
                 bool night = false, dungeon = false;
-                int bosses = CreatureSetup.BossLevel();
+                int bosses = CreatureSetup.BossLevel(Player.m_localPlayer != null ? Player.m_localPlayer.transform.position : UnityEngine.Vector3.zero);
                 for (int i = 2; i < args.Length; i++)
                 {
                     string a = args[i];

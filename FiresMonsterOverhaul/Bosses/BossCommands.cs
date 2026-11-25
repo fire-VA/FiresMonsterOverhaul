@@ -16,6 +16,7 @@ namespace FiresMonsterOverhaul.Bosses
 
         public static void Register()
         {
+            BossPhaseTest.Register();   // 0.0.40: fmo_boss_phase_test (Moder, Yagluth, The Queen, Fader phases)
             new Terminal.ConsoleCommand("fmo_boss_pattern", "<tethered|channelled|feeding|shelled|end> [feeder prefab] [radius] - Fires Monster Overhaul: start a healing pattern on the nearest boss this peer owns, for tests", args =>
             {
                 if (args.Length < 2) { args.Context?.AddString("fmo_boss_pattern: say tethered, channelled, feeding, shelled or end"); return; }

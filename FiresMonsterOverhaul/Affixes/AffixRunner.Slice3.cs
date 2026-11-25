@@ -101,7 +101,7 @@ namespace FiresMonsterOverhaul.Affixes
         private void TryReflect(ZDO zdo)
         {
             if (Time.time < _nextReflect) return;
-            if (_cast == null) _cast = GetComponent<MonsterCast>() ?? gameObject.AddComponent<MonsterCast>();
+            if (_cast == null) _cast = GetComponent<MonsterCast>() ?? Patches.HoldWhileCastingPatch.Added(gameObject.AddComponent<MonsterCast>());
             if (_cast.Active) return; // the glow always shows its bar; wait for a free cast slot
             float seconds = MonsterConfig.ReflectSeconds.Value;
             if (!_cast.Begin("reflect", seconds, false, 2, ReflectRingRadius, () => { }, holdStill: false)) return;
@@ -269,7 +269,7 @@ namespace FiresMonsterOverhaul.Affixes
         private void TryBlink()
         {
             if (Time.time < _nextBlink) return;
-            if (_cast == null) _cast = GetComponent<MonsterCast>() ?? gameObject.AddComponent<MonsterCast>();
+            if (_cast == null) _cast = GetComponent<MonsterCast>() ?? Patches.HoldWhileCastingPatch.Added(gameObject.AddComponent<MonsterCast>());
             if (_cast.Active) return;
             var target = PickBlinkPlayer();
             if (target == null) return;
@@ -292,8 +292,8 @@ namespace FiresMonsterOverhaul.Affixes
                 _character.m_body.velocity = Vector3.zero;
             }
             Vector3 look = target.transform.position - dest;
-            look.y = 0f;
-            if (look.sqrMagnitude > 0.01f) transform.rotation = Quaternion.LookRotation(look);
+            look = RingUp.Flat(look, dest);   // 0.0.46: halo ring plane
+            if (look.sqrMagnitude > 0.01f) transform.rotation = Quaternion.LookRotation(look, RingUp.Up(dest));
             if (_ai != null) _ai.m_targetCreature = target;
             MonsterLog.Debug($"affix: {Utils.GetPrefabName(gameObject)} blinked behind {target.GetPlayerName()} ({Vector3.Distance(from, dest):0.0} m) {_nview.GetZDO().m_uid}");
         }

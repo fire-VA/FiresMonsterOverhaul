@@ -12,23 +12,41 @@ namespace FiresMonsterOverhaul.Bosses
     {
         private const int PhaseHalf = 1 << 0;
         private const float HalfHealth = 0.5f;
+
+        private EntangleCaster _entangle;
+
+        public override void Tick(bool inCombat, float healthFraction)
+        {
+            if (_entangle == null) _entangle = new EntangleCaster(D);
+            if (healthFraction <= HalfHealth && D.FirePhase(PhaseHalf, "half", healthFraction))
+                D.StartPattern(HealPattern.Tethered, "phase half");
+            _entangle.WitherRoots();
+            if (!inCombat) return;
+            _entangle.TryEntangle();
+        }
+
+        public override void OnDeath() => _entangle?.OnDeath();
+
+        public override void ResetCooldowns() => _entangle?.ResetCooldowns();
+    }
+
+    /// <summary>
+    /// The Elder's Entangle, unchanged; 0.0.40 (boss phases): moved out of ElderScript so The Queen's second phase uses the
+    /// same code (same config keys, same roots, same log lines) instead of a copy.
+    /// </summary>
+    internal sealed class EntangleCaster
+    {
         private const float EntangleRange = 25f;
         private const float RootsInFront = 1.2f;  // the roots stand this far from the player, towards the Elder
         private const float RootsLinger = 1f;     // roots are removed this long after the root itself times out
 
+        private readonly BossDirector D;
         private float _nextEntangle;
         private readonly List<(ZDOID roots, float until)> _roots = new List<(ZDOID, float)>();
 
-        public override void Tick(bool inCombat, float healthFraction)
-        {
-            if (healthFraction <= HalfHealth && D.FirePhase(PhaseHalf, "half", healthFraction))
-                D.StartPattern(HealPattern.Tethered, "phase half");
-            WitherRoots();
-            if (!inCombat) return;
-            TryEntangle();
-        }
+        public EntangleCaster(BossDirector director) => D = director;
 
-        private void TryEntangle()
+        public void TryEntangle()
         {
             if (Time.time < _nextEntangle) return;
             var target = PickTarget();
@@ -70,18 +88,18 @@ namespace FiresMonsterOverhaul.Bosses
                 return;
             }
             Vector3 toBoss = D.transform.position - p;
-            toBoss.y = 0f;
+            toBoss = RingUp.Flat(toBoss, p);   // 0.0.46: halo ring plane
             Vector3 dir = toBoss.sqrMagnitude > 0.01f ? toBoss.normalized : player.transform.forward;
             float seconds = MonsterConfig.EntangleSeconds.Value;
             float health = MonsterConfig.EntangleRootsHealth.Value;
-            var roots = BossProps.Place(BossProps.EntangleRoots, p + dir * RootsInFront, Quaternion.LookRotation(-dir), health, D.Zdo.m_uid);
+            var roots = BossProps.Place(BossProps.EntangleRoots, p + dir * RootsInFront, Quaternion.LookRotation(-dir, RingUp.Up(p)), health, D.Zdo.m_uid);
             var rootsId = roots != null ? roots.GetZDO().m_uid : ZDOID.None;
             if (roots != null) _roots.Add((rootsId, Time.time + seconds + RootsLinger));
             Entangle.Broadcast(player.GetZDOID(), rootsId, seconds);
             MonsterLog.Debug($"boss: {D.Prefab} entangle hit {player.GetPlayerName()}: roots {rootsId} ({health:0} HP, up to {seconds:0} s) {D.Zdo.m_uid}");
         }
 
-        private void WitherRoots()
+        public void WitherRoots()
         {
             for (int i = _roots.Count - 1; i >= 0; i--)
             {
@@ -94,12 +112,12 @@ namespace FiresMonsterOverhaul.Bosses
             }
         }
 
-        public override void OnDeath()
+        public void OnDeath()
         {
             foreach (var (id, _) in _roots) BossProps.Remove(id);
             _roots.Clear();
         }
 
-        public override void ResetCooldowns() => _nextEntangle = 0f;
+        public void ResetCooldowns() => _nextEntangle = 0f;
     }
 }

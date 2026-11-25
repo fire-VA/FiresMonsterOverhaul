@@ -54,13 +54,13 @@ namespace FiresMonsterOverhaul.Setup
 #   creature <Prefab>  - one creature, e.g. creature Troll
 #   dungeon            - inside a dungeon or crypt
 #   night              - health and stars when it appears at night; damage while it is night
-#   bosslevel          - per boss defeated (0-7, Eikthyr to Fader): health=+10% adds 10 % for each boss
+#   bosslevel          - per boss tier (0-7, Eikthyr to Fader; the highest any nearby player has defeated): health=+10% adds 10 % per tier
 # Settings:
 #   health, damage     - multipliers: 1.2, 120% or +20% all mean x1.2
 #   star1, star2       - extra chance to be a 1-star / 2-star monster: 5% or 0.05
 # Multipliers from every matching line multiply; star chances add up. A monster is never lowered below the
 # stars vanilla gave it. Bosses, tamed creatures and possessed creatures are never changed.
-# With [1 - General] Lock Configuration on, the SERVER's file applies to every player.
+# With [01 - General] Lock Configuration on, the SERVER's file applies to every player.
 #
 # The shipped file is neutral: nothing below is active. Remove the leading # from a line to use it.
 #
@@ -205,7 +205,7 @@ namespace FiresMonsterOverhaul.Setup
 
         /// <summary>
         /// What the rules give one monster. Night's damage is returned separately (applied live while it is night);
-        /// a bosslevel rule counts once per boss defeated (+10% each).
+        /// a bosslevel rule counts once per boss tier, the highest a nearby player has defeated (+10% each).
         /// </summary>
         public static Result Evaluate(string prefab, Heightmap.Biome biome, bool dungeon, bool night, int bossLevel)
         {

@@ -75,7 +75,7 @@ namespace FiresMonsterOverhaul.Packs
                 var leaderPrefab = ZNetScene.instance != null ? ZNetScene.instance.GetPrefab(prefab) : null;
                 if (player == null || leaderPrefab == null) { args.Context?.AddString("fmo_pack: no local player or unknown prefab"); return; }
                 Vector3 p = player.transform.position + player.transform.forward * 6f;
-                if (ZoneSystem.instance != null && ZoneSystem.instance.GetGroundHeight(p, out float y)) p.y = y + 0.1f;
+                RingUp.Ground(ref p, 0.1f, "fmo spawn");   // 0.0.46: the ring floor on a halo ring, else the heightmap as before
                 var go = Object.Instantiate(leaderPrefab, p, Quaternion.identity);
                 var ai = go.GetComponent<MonsterAI>();
                 if (ai == null) { args.Context?.AddString($"fmo_pack: {prefab} has no MonsterAI"); return; }
@@ -134,8 +134,8 @@ namespace FiresMonsterOverhaul.Packs
                 if (prefab == null) continue;
                 Vector2 off = Random.insideUnitCircle.normalized * Random.Range(2.5f, 5f);
                 Vector3 p = leader.transform.position + new Vector3(off.x, 0f, off.y);
-                if (ZoneSystem.instance != null && ZoneSystem.instance.GetGroundHeight(p, out float y)) p.y = y + 0.1f;
-                var go = Object.Instantiate(prefab, p, Quaternion.Euler(0f, Random.Range(0f, 360f), 0f));
+                RingUp.Ground(ref p, 0.1f, "fmo spawn");   // 0.0.46: the ring floor on a halo ring, else the heightmap as before
+                var go = Object.Instantiate(prefab, p, RingUp.Upright(p, Random.Range(0f, 360f)));   // 0.0.46: upright to a halo ring
                 var nv = go.GetComponent<ZNetView>();
                 if (nv != null && nv.IsValid()) { nv.GetZDO().Set(ZdoPack, leaderId); ids.Add($"{followers[i]}={nv.GetZDO().m_uid}"); }
                 if (pinNormal) PinNormal(nv);

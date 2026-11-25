@@ -1,4 +1,4 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="15.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <Import Project="$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props" Condition="Exists('$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props')" />
   <PropertyGroup>
@@ -68,6 +68,10 @@
     <!-- FiresUnifiedCore: hard dependency (ICombatAgent seam, ground rings, ability RPCs, FiresLog). -->
     <Reference Include="FiresUnifiedCore">
       <HintPath>..\..\FiresUnifiedCore\FiresUnifiedCore\bin\Release\FiresUnifiedCore.dll</HintPath>
+      <Private>False</Private>
+    </Reference>
+    <Reference Include="YamlDotNet">
+      <HintPath>$(GamePath)\BepInEx\plugins\ValheimModding-YamlDotNet\YamlDotNet.dll</HintPath>
       <Private>False</Private>
     </Reference>
     <Reference Include="BepInEx">
@@ -141,6 +145,10 @@
     <Reference Include="UnityEngine.UIModule">
       <HintPath>..\..\..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\Valheim\valheim_Data\Managed\UnityEngine.UIModule.dll</HintPath>
     </Reference>
+    <Reference Include="UnityEngine.ScreenCaptureModule">
+      <HintPath>..\..\..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\Valheim\valheim_Data\Managed\UnityEngine.ScreenCaptureModule.dll</HintPath>
+      <Private>False</Private>
+    </Reference>
     <Reference Include="UnityEngine.UnityWebRequestModule">
       <HintPath>..\..\..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\Valheim\valheim_Data\Managed\UnityEngine.UnityWebRequestModule.dll</HintPath>
     </Reference>
@@ -148,6 +156,15 @@
   <ItemGroup>
     <Compile Include="Plugin.cs" />
     <Compile Include="MonsterLog.cs" />
+    <Compile Include="RingUp.cs" />
+    <Compile Include="CreatureDiving.cs" />
+    <Compile Include="CoreSettingsOwned.cs" />   <!-- 0.0.47 creature diving (from Galaxies) -->   <!-- 0.0.46 halo ring up -->
+    <Compile Include="ConfigRanges.cs" />
+    <Compile Include="MonsterConfigUi.cs" />
+    <Compile Include="Perf\FmoPerf.cs" />
+    <Compile Include="Gear\MonsterGear.cs" />
+    <Compile Include="Gear\SetDrops.cs" />
+    <Compile Include="Bosses\FightLog.cs" />
     <Compile Include="MonsterConfig.cs" />
     <Compile Include="Agent\MonsterAgent.cs" />
     <Compile Include="Agent\MonsterBrain.cs" />
@@ -179,10 +196,22 @@
     <Compile Include="Bosses\EikthyrScript.cs" />
     <Compile Include="Bosses\BossDirector.Patterns.cs" />
     <Compile Include="Bosses\ElderScript.cs" />
+    <Compile Include="Bosses\PlagueEffect.cs" />
+    <Compile Include="Bosses\BonemassScript.cs" />
+    <Compile Include="Bosses\BossDirector.Scaling.cs" />
+    <Compile Include="Scaling\GroupScaler.cs" />
+    <Compile Include="Scaling\PowerScore.cs" />
+    <Compile Include="Scaling\ScalingConfig.cs" />
     <Compile Include="Bosses\SpiritForm.cs" />
     <Compile Include="Bosses\BossProps.cs" />
     <Compile Include="Bosses\Entangle.cs" />
     <Compile Include="Bosses\BossCommands.cs" />
+    <Compile Include="Bosses\TwoPhaseBossScript.cs" />
+    <Compile Include="Bosses\ModerScript.cs" />
+    <Compile Include="Bosses\YagluthScript.cs" />
+    <Compile Include="Bosses\QueenScript.cs" />
+    <Compile Include="Bosses\FaderScript.cs" />
+    <Compile Include="Bosses\BossPhaseTest.cs" />
     <Compile Include="Abilities\Adds.cs" />
     <Compile Include="Abilities\BreakableProp.cs" />
     <Compile Include="Affixes\PurifyHook.cs" />

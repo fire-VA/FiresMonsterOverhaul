@@ -75,6 +75,13 @@ namespace FiresMonsterOverhaul.Abilities
 
         private void Update()
         {
+            long perfT = FiresMonsterOverhaul.Perf.FmoPerf.Start();
+            try { UpdateBody(); }
+            finally { FiresMonsterOverhaul.Perf.FmoPerf.Stop(FiresMonsterOverhaul.Perf.FmoPerf.Path.VeteranAbilities, perfT); }
+        }
+
+        private void UpdateBody()
+        {
             if (Time.time < _nextTick) return;
             _nextTick = Time.time + Tick;
             if (!Active(out var target)) { _charging = false; _sidestepAt = 0f; return; }
@@ -91,7 +98,7 @@ namespace FiresMonsterOverhaul.Abilities
 
         private MonsterCast Cast()
         {
-            if (_cast == null) _cast = GetComponent<MonsterCast>() ?? gameObject.AddComponent<MonsterCast>();
+            if (_cast == null) _cast = GetComponent<MonsterCast>() ?? Patches.HoldWhileCastingPatch.Added(gameObject.AddComponent<MonsterCast>());
             return _cast;
         }
 
@@ -184,11 +191,11 @@ namespace FiresMonsterOverhaul.Abilities
             _sidestepAt = 0f;
             _nextAbility = Time.time + MonsterConfig.SidestepCooldown.Value;
             Vector3 toTarget = target.transform.position - transform.position;
-            toTarget.y = 0f;
+            toTarget = RingUp.Flat(toTarget, transform.position);   // 0.0.46: halo ring plane
             if (toTarget.sqrMagnitude < 0.01f) toTarget = transform.forward;
             toTarget.Normalize();
             bool left = Random.value < 0.5f;
-            Vector3 side = Vector3.Cross(Vector3.up, toTarget) * (left ? -1f : 1f);
+            Vector3 side = Vector3.Cross(RingUp.Up(transform.position), toTarget) * (left ? -1f : 1f);
             float distance = MonsterConfig.SidestepDistance.Value;
             _moveTarget = transform.position + side * distance - toTarget * SidestepBack;
             _moveUntil = Time.time + SidestepSeconds;
@@ -207,7 +214,7 @@ namespace FiresMonsterOverhaul.Abilities
         internal static void Dash(MonsterAI ai, Vector3 target)
         {
             Vector3 d = target - ai.transform.position;
-            d.y = 0f;
+            d = RingUp.Flat(d, ai.transform.position);   // 0.0.46: halo ring plane
             if (d.magnitude <= MoveStopDistance) { ai.StopMoving(); return; }
             ai.MoveTowards(d, true);
         }
@@ -218,7 +225,7 @@ namespace FiresMonsterOverhaul.Abilities
             if (_charging)
             {
                 Vector3 flat = transform.position - _chargeSpot;
-                flat.y = 0f;
+                flat = RingUp.Flat(flat, transform.position);   // 0.0.46: halo ring plane
                 if (flat.magnitude <= ChargeArriveDistance) { EndCharge(true); return false; }
                 if (Time.time > _chargeUntil || _character.IsDead()) { EndCharge(false); return false; }
                 Dash(ai, _chargeSpot);

@@ -69,9 +69,12 @@ namespace FiresMonsterOverhaul.Bosses
     internal sealed class EntangleWatch : MonoBehaviour
     {
         private const float Poll = 0.25f;
+        // 0.0.43 (REAL MP bug, ghost r7 "entangle on Vafire broken after 0.0 s"): when another peer owns the boss, the root RPC
+        // reaches this client before the roots' ZDO does, so "roots gone" counts only once they were seen here, or after this grace.
+        private const float RootsArriveGrace = 3f;
         private ZDOID _roots;
         private float _start, _until, _nextPoll;
-        private bool _active;
+        private bool _active, _seen;
 
         public void Begin(ZDOID roots, float seconds)
         {
@@ -79,6 +82,7 @@ namespace FiresMonsterOverhaul.Bosses
             _start = Time.time;
             _until = Time.time + seconds;
             _active = true;
+            _seen = BossProps.Exists(roots);   // 0.0.43: false while the roots' ZDO is still on its way from the boss's owner
         }
 
         private void Update()
@@ -90,7 +94,9 @@ namespace FiresMonsterOverhaul.Bosses
             var seman = player.GetSEMan();
             string how = null;
             if (player.IsDead()) how = "died";
-            else if (!BossProps.Exists(_roots)) how = "broken";
+            else if (!BossProps.Exists(_roots) && (_seen || Time.time - _start >= RootsArriveGrace))
+                how = _seen ? "broken" : "broken (its roots never arrived here)";   // 0.0.43: wait for the roots' ZDO first
+            else if (!_seen && BossProps.Exists(_roots)) _seen = true;   // 0.0.43: the roots arrived; then the checks below
             else if (!seman.HaveStatusEffect(EntangledEffect.Hash)) how = Time.time >= _until - Poll ? "timed out" : "cleansed";
             else if (Time.time >= _until) how = "timed out";
             if (how == null) return;

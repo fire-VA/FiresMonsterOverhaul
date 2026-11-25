@@ -114,6 +114,13 @@ namespace FiresMonsterOverhaul.Casts
 
         private void Update()
         {
+            long perfT = FiresMonsterOverhaul.Perf.FmoPerf.Start();
+            try { UpdateBody(); }
+            finally { FiresMonsterOverhaul.Perf.FmoPerf.Stop(FiresMonsterOverhaul.Perf.FmoPerf.Path.MonsterCast, perfT); }
+        }
+
+        private void UpdateBody()
+        {
             if (!Active) return;
             if (_nview == null || !_nview.IsValid() || !_nview.IsOwner() || _character == null || _character.IsDead())
             {
